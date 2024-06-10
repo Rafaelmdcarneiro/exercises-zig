@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+execute_test() {
+  (
+    cd "${1}"
+    # Get the exercise name from the directory
+    local exercise_name
+    exercise_name=$(echo "$1" | tr '-' '_')
+
+    printf '%s\n' "Running tests for ${1}..." >&2
+
+    # Copy the examples with the correct name for the exercise
+    if [[ -f "./.meta/example.zig" ]]; then
+      mv ./.meta/example.zig "${exercise_name}".zig
+      # No building required, just test it
+      zig test "test_${exercise_name}.zig"
+      printf '\n' >&2
+    else
+      printf '%s\n' "Error: ${exercise_name} lacks its '.meta/example.zig' file" >&2
+      exit 1
+    fi
+  )
+}
+
+main() {
+  # Move to the root directory of the repo so you can run this script from anywhere
+  local script_dir
+  script_dir="$(cd "$(dirname "$0")" >/dev/null 2>&1 && pwd)"
+  cd "${script_dir}"/..
+
+  if [[ ! -d "exercises/practice" ]]; then
+    printf '%s\n' "Error: the 'exercises/practice' directory is missing" >&2
+    exit 1
+  fi
+
+  # Clear up any previous run
+  rm -rf build
+
+  cp -r exercises/practice build
+
+  (
+    cd build/
+
+    # Allow specifying which tests to run as arguments
+    if [[ $# -gt 0 ]]; then
+      local exercises=("$@")
+      for exercise in "${exercises[@]}"; do
+        if [[ ! -d "${exercise}" ]]; then
+          printf '%s\n' "Error: the specified exercise '${1}' does not exist" >&2
+          exit 1
+        fi
+      done
+    else
+      local exercises=(*)
+    fi
+
+    for exercise in "${exercises[@]}"; do
+      execute_test "${exercise}"
+    done
+  )
+
+  # Clean up duplicate exercises
+  rm -rf build
+}
+
+main "$@"
